@@ -115,8 +115,8 @@ namespace LocalMultiplayer
                 if (GUILayout.Button("Create New Controller"))
                 {
                     int NewID = 2;
-                    while (Overrides.ContainsKey("Player Tech #" + NewID.ToString())) NewID++;
-                    Overrides.Add("Player Tech #" + NewID.ToString(), new Overrider());
+                    while (Overrides.ContainsKey("Player Tech " + NewID.ToString())) NewID++;
+                    Overrides.Add("Player Tech " + NewID.ToString(), new Overrider());
                     Names = null;
                 }
                 if (SelectionIndex != -1 && Overrides.Count != 0)
@@ -142,10 +142,9 @@ namespace LocalMultiplayer
                 {
                     scroll1 = GUILayout.BeginScrollView(scroll1, false, false);
                     GUI.changed = false;
-                    bool flag = Names == null;
-                    if (flag) Names = Overrides.Keys.ToArray();
+                    if (Names == null) Names = Overrides.Keys.ToArray();
                     SelectionIndex = GUILayout.SelectionGrid(SelectionIndex, Names, Overrides.Count);
-                    if ((flag || GUI.changed) && SelectionIndex != -1)
+                    if (GUI.changed && SelectionIndex != -1)
                     {
                         try
                         {

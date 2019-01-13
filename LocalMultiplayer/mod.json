@@ -1,0 +1,9 @@
+﻿{
+  "Id": "ttmm.localmp",
+  "DisplayName": "Local Multiplayer Injector",
+  "Author": "Aceba1",
+  "Version": "2",
+  "Enable": true,
+  "AssemblyName": "LocalMultiplayer.dll",
+  "EntryMethod": "LocalMultiplayer.OverrideBase.Init"
+}

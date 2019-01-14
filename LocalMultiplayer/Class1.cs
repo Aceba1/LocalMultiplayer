@@ -281,7 +281,7 @@ namespace LocalMultiplayer
                     }
 
                     var euler = Quaternion.Euler(0, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
-                    var offset = euler * new Vector3(0, 1.25f, -3);
+                    var offset = euler * new Vector3(0, 2f, -4);
                     offset *= BoundTank.blockBounds.extents.magnitude;
 
                     transform.position = BoundTank.WorldCenterOfMass + offset;

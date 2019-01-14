@@ -11,6 +11,9 @@ namespace LocalMultiplayer
 {
     public class OverrideBase
     {
+        internal static string NewCamTarget = "";
+        internal static bool NewCam = false;
+
         public static Dictionary<string, Overrider> Overrides;
         public static ModConfig modconfig;
 
@@ -23,6 +26,10 @@ namespace LocalMultiplayer
             if (Overrides == null)
             {
                 Overrides = new Dictionary<string, Overrider>();
+            }
+            foreach(var o in Overrides)
+            {
+                o.Value.Validate();
             }
             new GameObject("Override Controller").AddComponent<OverrideController>();
         }
@@ -42,7 +49,8 @@ namespace LocalMultiplayer
                             return false;
                         }
                         return true;
-                    } catch { }
+                    }
+                    catch { }
                     return true;
                 }
             }
@@ -61,7 +69,8 @@ namespace LocalMultiplayer
                         {
                             m_NudgeInput.SetValue(__instance, Overrides[name].GetAxis());
                         }
-                    } catch { }
+                    }
+                    catch { }
                 }
             }
         }
@@ -107,7 +116,7 @@ namespace LocalMultiplayer
             }
             Vector2 scroll1, scroll2;
             string Selected = "";
-            string[] Names, Triggers;
+            string[] Names;
             int SelectionIndex, TriggerIndex;
             void GUIWindow(int ID)
             {
@@ -116,7 +125,10 @@ namespace LocalMultiplayer
                 {
                     int NewID = 2;
                     while (Overrides.ContainsKey("Player Tech " + NewID.ToString())) NewID++;
-                    Overrides.Add("Player Tech " + NewID.ToString(), new Overrider());
+                    var o = new Overrider();
+                    o.Validate();
+                    Overrides.Add("Player Tech " + NewID.ToString(), o);
+
                     Names = null;
                 }
                 if (SelectionIndex != -1 && Overrides.Count != 0)
@@ -143,7 +155,7 @@ namespace LocalMultiplayer
                     scroll1 = GUILayout.BeginScrollView(scroll1, false, false);
                     GUI.changed = false;
                     if (Names == null) Names = Overrides.Keys.ToArray();
-                    SelectionIndex = GUILayout.SelectionGrid(SelectionIndex, Names, Overrides.Count);
+                    SelectionIndex = GUILayout.SelectionGrid(SelectionIndex, Names, 5);
                     if (GUI.changed && SelectionIndex != -1)
                     {
                         try
@@ -163,6 +175,15 @@ namespace LocalMultiplayer
                     GUILayout.EndScrollView();
                     if (SelectionIndex != -1)
                     {
+                        var Override = Overrides[Selected];
+                        GUILayout.BeginHorizontal();
+                        Override.ReverseSteering = GUILayout.Toggle(Override.ReverseSteering,"Invert Reverse");
+                        if (GUILayout.Button("Activate Camera"))
+                        {
+                            NewCam = true;
+                            NewCamTarget = Selected;
+                        }
+                        GUILayout.EndHorizontal();
                         GUILayout.Label("Name of techs to override with this controller");
                         string oldsel = Selected;
                         Selected = GUILayout.TextField(Selected);
@@ -174,9 +195,8 @@ namespace LocalMultiplayer
                             }
                             else
                             {
-                                var ovc = Overrides[oldsel];
                                 Overrides.Remove(oldsel);
-                                Overrides.Add(Selected, ovc);
+                                Overrides.Add(Selected, Override);
                                 Names = null;
                             }
                         }
@@ -186,21 +206,21 @@ namespace LocalMultiplayer
                             var e = Event.current;
                             if (e.isKey)
                             {
-                                Overrides[Selected].Drive[SetTrigger] = e.keyCode;
+                                Override.Drive[SetTrigger] = e.keyCode;
                                 IsSettingKeybind = false;
                             }
                         }
                         if (SetTrigger != "")
                         {
-                            IsSettingKeybind = GUILayout.Button(IsSettingKeybind ? "Press a key for use" : Overrides[Selected].Drive[SetTrigger].ToString()) != IsSettingKeybind;
+                            IsSettingKeybind = GUILayout.Button(IsSettingKeybind ? "Press a key for use" : Override.Drive[SetTrigger].ToString()) != IsSettingKeybind;
                         }
                         GUILayout.Label("Choose a function below to change the key bound to it");
                         scroll2 = GUILayout.BeginScrollView(scroll2);
-                        if (Triggers == null) Triggers = Overrides[Selected].Drive.Keys.ToArray();
-                        TriggerIndex = GUILayout.SelectionGrid(TriggerIndex, Triggers, 2);
+                        TriggerIndex = GUILayout.SelectionGrid(TriggerIndex, Overrider.DriveReference, 2);
                         if (GUI.changed && SelectionIndex != -1)
                         {
-                            SetTrigger = Triggers[TriggerIndex];
+                            SetTrigger = Overrider.DriveReference[TriggerIndex];
+                            IsSettingKeybind = false;
                         }
                         GUILayout.EndScrollView();
                     }
@@ -211,6 +231,108 @@ namespace LocalMultiplayer
 
         public class Overrider
         {
+            public class ControllerCam : MonoBehaviour
+            {
+                public static bool IsMoving = false;
+                public bool isMoving = false;
+                Tank BoundTank;
+                string TankName;
+                Camera Render;
+
+                public static void Create(Tank tank)
+                {
+                    new GameObject("Cam").AddComponent<ControllerCam>().SetCamera(tank).parent = tank.transform;
+                }
+                Transform SetCamera(Tank tank)
+                {
+                    Render = gameObject.AddComponent<Camera>();
+                    Start = new Vector2(0, 0);
+                    Stretch = new Vector2(200, 150);
+                    Render.rect = new Rect(Start.x / Screen.width, Start.y / Screen.height, Stretch.x / Screen.width, Stretch.y / Screen.height);
+                    BoundTank = tank;
+                    TankName = tank.name;
+                    return transform;
+                }
+
+                Vector2 Start, Stretch;
+                Vector2 OldValue;
+                Vector2 StartMove;
+                bool IsScaling;
+
+                void OnGUI()
+                {
+                    if (BoundTank == null || Singleton.playerTank == null)
+                        return;
+                    var angle = Mathf.RoundToInt(Vector3.SignedAngle(BoundTank.rootBlockTrans.forward, Vector3.Scale(BoundTank.rootBlockTrans.InverseTransformPoint(Singleton.playerTank.transform.position), new Vector3(1,0,1)), Vector3.up));
+
+                    GUI.Label(new Rect(Start.x, Screen.height - Start.y - Stretch.y, Stretch.x - 50, 30), TankName);
+                    GUI.Box(new Rect(Start.x + Stretch.x - 50, Screen.height - Start.y-Stretch.y, 50, 30), angle.ToString());
+                }
+
+                void Update()
+                {
+                    if (BoundTank == null || BoundTank.name != TankName)
+                    {
+                        Destroy(gameObject);
+                        if (isMoving)
+                            IsMoving = false;
+                        return;
+                    }
+
+                    var euler = Quaternion.Euler(0, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
+                    var offset = euler * new Vector3(0, 1.25f, -3);
+                    offset *= BoundTank.blockBounds.extents.magnitude;
+
+                    transform.position = BoundTank.WorldCenterOfMass + offset;
+                    transform.rotation = Quaternion.Euler(0, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
+
+                    if (!IsMoving)
+                    {
+                        if (Input.GetMouseButtonDown(0))
+                        {
+                            Vector2 mouse = GUIUtility.ScreenToGUIPoint(new Vector2(Input.mousePosition.x, Input.mousePosition.y));
+                            if (new Rect(Start.x + Stretch.x - 50, Start.y+ Stretch.y - 30, 50, 30).Contains(mouse))
+                            {
+                                IsMoving = true; isMoving = true; IsScaling = true;
+                                StartMove = mouse;
+                                OldValue = Stretch;
+                                //Start = new Vector2(Render.rect.x * Screen.width, Render.rect.y * Screen.height);
+                            }
+                            else if (new Rect(Start, Stretch).Contains(mouse))
+                            {
+                                IsMoving = true; isMoving = true; IsScaling = false;
+
+                                Stretch = new Vector2(Render.rect.width * Screen.width, Render.rect.height * Screen.height);
+                                StartMove = mouse;
+                                OldValue = Start;
+                            }
+                        }
+                    }
+                    if (isMoving)
+                    {
+                        Vector2 mouse = GUIUtility.ScreenToGUIPoint(new Vector2(Input.mousePosition.x, Input.mousePosition.y));
+                        if (IsScaling)
+                        {
+                            Stretch = mouse - StartMove + OldValue;
+                        }
+                        else
+                        {
+                            Start = mouse - StartMove + OldValue;
+                        }
+                        Stretch.x = Mathf.Max(80, Stretch.x);
+                        Stretch.y = Mathf.Max(60, Stretch.y);
+                        Start.x = Mathf.Min(Screen.width - Stretch.x, Mathf.Max(0, Start.x));
+                        Start.y = Mathf.Min(Screen.height - Stretch.y, Mathf.Max(0, Start.y));
+                        Render.rect = new Rect(Start.x / Screen.width, Start.y / Screen.height, Stretch.x / Screen.width, Stretch.y / Screen.height);
+                        if (!Input.GetMouseButton(0))
+                        {
+                            IsMoving = false;
+                            isMoving = false;
+                        }
+                    }
+                }
+            }
+
             //static MethodInfo _ApplyThrottle;
             //public static void ApplyThrottle(TankControl This, bool enabled, ref float input, ref float throttleValue, ref float lastInput, ref float inputTiming)
             //{
@@ -221,34 +343,46 @@ namespace LocalMultiplayer
             //    }
             //    _ApplyThrottle.Invoke(This, new object[] { enabled, input, throttleValue, lastInput, inputTiming });
             //}
-            public Dictionary<string, KeyCode> Drive = new Dictionary<string, KeyCode>(){
-                //{ "MoveX_MoveRight", KeyCode.None },
-                //{ "MoveX_MoveLeft", KeyCode.None },
-                //{ "MoveY_MoveUp", KeyCode.None },
-                //{ "MoveY_MoveDown", KeyCode.None },
-                { "MoveZ_MoveForward", KeyCode.None },
-                { "MoveZ_MoveBackward", KeyCode.None },
-                //{ "RotateX_PitchUp", KeyCode.None },
-                //{ "RotateX_PitchDown", KeyCode.None },
-                { "RotateY_YawLeft", KeyCode.None },
-                { "RotateY_YawRight", KeyCode.None },
-                //{ "RotateZ_RollRight", KeyCode.None },
-                //{ "RotateZ_RollLeft", KeyCode.None },
-                { "BoostPropellers", KeyCode.None },
-                { "BoostJets", KeyCode.None },
-                { "FireControl", KeyCode.None },
-                { "BuildBeam", KeyCode.None },
-                { "DetonateExplosiveBolt", KeyCode.None } };
-            public Overrider()
-            {
+            public Dictionary<string, KeyCode> Drive = new Dictionary<string, KeyCode>();
 
-            }
-            public Overrider(Dictionary<string,KeyCode> Copy)
+            public static string[] DriveReference = new string[]{
+                // "MoveX_MoveRight", 
+                // "MoveX_MoveLeft", 
+                // "MoveY_MoveUp", 
+                // "MoveY_MoveDown", 
+                 "MoveZ_MoveForward",
+                 "MoveZ_MoveBackward", 
+                // "RotateX_PitchUp", 
+                // "RotateX_PitchDown", 
+                 "RotateY_YawLeft",
+                 "RotateY_YawRight", 
+                // "RotateZ_RollRight", 
+                // "RotateZ_RollLeft",
+                 "BoostPropellers",
+                 "BoostJets",
+                 "FireControl",
+                 "BuildBeam",
+                 "DetonateExplosiveBolt",
+                 "Anchor"};
+            public Overrider() { }
+            public void Validate()
             {
-                foreach(var thing in Drive.Keys)
+                foreach(var thing in DriveReference)
+                {
+                    if (!Drive.ContainsKey(thing))
+                    {
+                        Drive.Add(thing, KeyCode.None);
+                    }
+                }
+            }
+            public Overrider(Dictionary<string, KeyCode> Copy)
+            {
+                foreach (var thing in DriveReference)
                 {
                     if (Copy.ContainsKey(thing))
-                    Drive[thing] = Copy[thing];
+                        Drive.Add(thing, Copy[thing]);
+                    else
+                        Drive.Add(thing, KeyCode.None);
                 }
             }
 
@@ -267,27 +401,49 @@ namespace LocalMultiplayer
                 return Input.GetKeyDown(Drive[Key]);
             }
 
+            private int AnchorCache;
             //private Vector3 m_ThrottleLastInput;
             public void GetInput(TankControl This)
             {
+                var Tank = This.GetComponentInParent<Tank>();
+                if (NewCam)
+                {
+                    if (NewCamTarget == Tank.name)
+                    {
+                        NewCam = false;
+                        NewCamTarget = "";
+                        ControllerCam cam = Tank.gameObject.GetComponentInChildren<ControllerCam>();
+                        if (cam == null)
+                        {
+                            ControllerCam.Create(Tank);
+                        }
+                        else
+                        {
+                            if (cam.isMoving)
+                                ControllerCam.IsMoving = false;
+                            GameObject.Destroy(cam.gameObject);
+                        }
+                    }
+                }
                 //Vector3 inputMovement = new Vector3(ReadDriveAxisPair("MoveX_MoveRight", "MoveX_MoveLeft"), ReadDriveAxisPair("MoveY_MoveUp", "MoveY_MoveDown"), ReadDriveAxisPair("MoveZ_MoveForward", "MoveZ_MoveBackward"));
                 //Vector3 inputRotation = new Vector3(ReadDriveAxisPair("RotateX_PitchUp", "RotateX_PitchDown"), ReadDriveAxisPair("RotateY_YawLeft", "RotateY_YawRight"), ReadDriveAxisPair("RotateZ_RollRight", "RotateZ_RollLeft"));
 
                 //ApplyThrottle(This, true, ref inputMovement.x, ref this.m_ThrottleValues.x, ref this.m_ThrottleLastInput.x, ref this.m_ThrottleTiming.x);
                 //ApplyThrottle(This, true, ref inputMovement.y, ref this.m_ThrottleValues.y, ref this.m_ThrottleLastInput.y, ref this.m_ThrottleTiming.y);
                 //ApplyThrottle(This, true, ref inputMovement.z, ref this.m_ThrottleValues.z, ref this.m_ThrottleLastInput.z, ref this.m_ThrottleTiming.z);
-                //if (ReverseSteering && (inputMovement.z < -0.01f/* || this.m_ThrottleValues[2] < -0.01f*/))
-                //{
-                //    Vector3 forward = This.Tech.rootBlockTrans.forward;
-                //    if (Vector3.Dot(This.Tech.rbody.velocity, forward) < 0f)
-                //    {
-                //        inputRotation.y *= -1f;
-                //    }
-                //}
+                var Rotate = (ReadInput("RotateY_YawLeft") ? 1 : 0) + (ReadInput("RotateY_YawRight") ? -1 : 0);
+                if (ReverseSteering && ReadInput("MoveZ_MoveBackward"/* || this.m_ThrottleValues[2] < -0.01f*/))
+                {
+                    Vector3 forward = This.Tech.rootBlockTrans.forward;
+                    if (Vector3.Dot(This.Tech.rbody.velocity, forward) < 0f)
+                    {
+                        Rotate = -Rotate;
+                    }
+                }
                 //this.m_ControlState.m_State.m_InputMovement = inputMovement;
                 This.DriveControl = (ReadInput("MoveZ_MoveForward") ? 1 : 0) + (ReadInput("MoveZ_MoveBackward") ? -1 : 0);//inputMovement.z;
                 //this.m_ControlState.m_State.m_InputRotation = inputRotation;
-                This.TurnControl = (ReadInput("RotateY_YawLeft") ? 1 : 0) + (ReadInput("RotateY_YawRight") ? -1 : 0);//inputRotation.y;
+                This.TurnControl = Rotate;//inputRotation.y;
 
                 //this.m_ControlState.m_State.m_ThrottleValues = this.m_ThrottleValues;
                 This.BoostControlProps = ReadInput("BoostPropellers");
@@ -303,12 +459,54 @@ namespace LocalMultiplayer
                 }
                 if (ReadInputDown("DetonateExplosiveBolt"))
                     This.DetonateExplosiveBolt();
+
+                //ANCHOR
+                {
+                    if (ReadInputDown("Anchor"))
+                    {
+                        AnchorCache = Tank.IsAnchored ? 2 : 1;
+                    }
+                    if (ReadInput("Anchor") && AnchorCache == (Tank.IsAnchored ? 2 : 1))
+                    {
+                        try
+                        {
+                            if (Tank.IsAnchored)
+                            {
+                                Tank.Anchors.UnanchorAll();
+                                AnchorCache = ((AnchorCache == (Tank.IsAnchored ? 2 : 1)) ? 2 : 0);
+                            }
+                            else
+                            {
+                                Vector3 position = Tank.transform.position;
+                                Quaternion rotation = Tank.transform.rotation;
+                                Vector3 velocity = Tank.rbody.velocity;
+                                Vector3 angularVelocity = Tank.rbody.angularVelocity;
+                                Tank.Anchors.TryAnchorAll(false);
+                                if (AnchorCache == (Tank.IsAnchored ? 2 : 1))
+                                {
+                                    Tank.transform.position = position;
+                                    Tank.transform.rotation = rotation;
+                                    Tank.rbody.velocity = velocity;
+                                    Tank.rbody.angularVelocity = angularVelocity;
+                                }
+                                else
+                                {
+                                    AnchorCache = 0;
+                                }
+                            }
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
             }
 
             internal Vector2 GetAxis()
             {
-                return new Vector2((ReadInput("RotateY_YawLeft") ? 1 : 0) + (ReadInput("RotateY_YawRight") ? -1 : 0), (ReadInput("MoveZ_MoveForward") ? 1 : 0) + (ReadInput("MoveZ_MoveBackward") ? -1 : 0));
+                return new Vector2((ReadInput("RotateY_YawLeft") ? -1 : 0) + (ReadInput("RotateY_YawRight") ? 1 : 0), (ReadInput("MoveZ_MoveForward") ? 1 : 0) + (ReadInput("MoveZ_MoveBackward") ? -1 : 0));
             }
         }
     }
 }
+//Whatever it takes

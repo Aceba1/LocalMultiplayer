@@ -216,6 +216,7 @@ namespace LocalMultiplayer
                         }
                         GUILayout.Label("Choose a function below to change the key bound to it");
                         scroll2 = GUILayout.BeginScrollView(scroll2);
+                        GUI.changed = false;
                         TriggerIndex = GUILayout.SelectionGrid(TriggerIndex, Overrider.DriveReference, 2);
                         if (GUI.changed && SelectionIndex != -1)
                         {

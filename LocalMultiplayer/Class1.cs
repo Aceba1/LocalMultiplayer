@@ -264,7 +264,7 @@ namespace LocalMultiplayer
                 {
                     if (BoundTank == null || Singleton.playerTank == null)
                         return;
-                    var angle = Mathf.RoundToInt(Vector3.SignedAngle(BoundTank.rootBlockTrans.forward, Vector3.Scale(BoundTank.rootBlockTrans.InverseTransformPoint(Singleton.playerTank.transform.position), new Vector3(1,0,1)), Vector3.up));
+                    var angle = Mathf.RoundToInt(Vector3.SignedAngle(BoundTank.rootBlockTrans.forward, Vector3.Scale(BoundTank.rootBlockTrans.InverseTransformPoint(Singleton.playerTank.rootBlockTrans.position), new Vector3(1,0,1)), Vector3.up));
 
                     GUI.Label(new Rect(Start.x, Screen.height - Start.y - Stretch.y, Stretch.x - 50, 30), TankName);
                     GUI.Box(new Rect(Start.x + Stretch.x - 50, Screen.height - Start.y-Stretch.y, 50, 30), angle.ToString());

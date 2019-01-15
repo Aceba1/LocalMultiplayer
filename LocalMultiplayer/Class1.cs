@@ -80,8 +80,8 @@ namespace LocalMultiplayer
             bool IsSettingKeybind = false;
             string SetTrigger = "";
             int ID = 5189012;
-            bool Show = false;
-            Rect rect = new Rect(0, 0, 800, 600);
+            bool Show = false, ShowControllerSetup = false;
+            Rect rect = new Rect(0, 0, 800, 600), rect2 = new Rect(0, 0, 800, 600);
             void Start()
             {
                 modconfig.UpdateConfig += ConfigUpdate;
@@ -114,7 +114,7 @@ namespace LocalMultiplayer
                     }
                 }
             }
-            Vector2 scroll1, scroll2;
+            Vector2 scroll1, scroll2, scroll3;
             string Selected = "";
             string[] Names;
             int SelectionIndex, TriggerIndex;
@@ -137,7 +137,7 @@ namespace LocalMultiplayer
                     {
                         int NewID = 2;
                         while (Overrides.ContainsKey(Selected + " " + NewID.ToString())) NewID++;
-                        Overrides.Add(Selected + " " + NewID.ToString(), new Overrider(Overrides[Selected].Drive));
+                        Overrides.Add(Selected + " " + NewID.ToString(), new Overrider(Overrides[Selected]));
                         Names = null;
                     }
                     if (GUILayout.Button("Delete Sel."))
@@ -177,7 +177,13 @@ namespace LocalMultiplayer
                     {
                         var Override = Overrides[Selected];
                         GUILayout.BeginHorizontal();
-                        Override.ReverseSteering = GUILayout.Toggle(Override.ReverseSteering,"Invert Reverse");
+                        Override.CurrentJoystick = GUILayout.Toggle(Override.CurrentJoystick != -1, "") ? (Override.CurrentJoystick == -1 ? 0 : Override.CurrentJoystick) : -1;
+                        GUILayout.Label("Use Joystick");
+                        int.TryParse(GUILayout.TextField(Override.CurrentJoystick.ToString()), out Override.CurrentJoystick);
+                        GUILayout.EndHorizontal();
+                        GUILayout.BeginHorizontal();
+                        Override.ReverseSteering = GUILayout.Toggle(Override.ReverseSteering, "");
+                        GUILayout.Label("Invert Reverse Steering");
                         if (GUILayout.Button("Activate Camera"))
                         {
                             NewCam = true;
@@ -203,16 +209,49 @@ namespace LocalMultiplayer
 
                         if (IsSettingKeybind)
                         {
-                            var e = Event.current;
-                            if (e.isKey)
+                            if (Override.CurrentJoystick != -1)
                             {
-                                Override.Drive[SetTrigger] = e.keyCode;
                                 IsSettingKeybind = false;
                             }
+                            else
+                            {
+                                var e = Event.current;
+                                if (e.isKey)
+                                {
+                                    Override.Drive[SetTrigger] = e.keyCode;
+                                    IsSettingKeybind = false;
+                                }
+                            }
                         }
+
                         if (SetTrigger != "")
                         {
-                            IsSettingKeybind = GUILayout.Button(IsSettingKeybind ? "Press a key for use" : Override.Drive[SetTrigger].ToString()) != IsSettingKeybind;
+                            if (Override.CurrentJoystick != -1)
+                            {
+                                GUILayout.BeginHorizontal();
+                                {
+                                    GUILayout.BeginVertical();
+                                    {
+                                        GUILayout.Label($"Drive X : {(Override.JoystickAxisX == -1?"No Axis":"Axis "+Override.JoystickAxisX)}");
+                                        Override.JoystickAxisX = Mathf.RoundToInt(GUILayout.HorizontalSlider(Override.JoystickAxisX, -1, 7));
+                                    }
+                                    GUILayout.EndVertical();
+                                    GUILayout.BeginVertical();
+                                    {
+                                        GUILayout.Label($"Drive Y : {(Override.JoystickAxisY == -1 ? "No Axis" : "Axis " + Override.JoystickAxisY)}");
+                                        Override.JoystickAxisY = Mathf.RoundToInt(GUILayout.HorizontalSlider(Override.JoystickAxisY, -1, 7));
+                                    }
+                                    GUILayout.EndVertical();
+                                }
+                                GUILayout.EndHorizontal();
+                                var key = Override.Drive[SetTrigger];
+                                GUILayout.Label($"{SetTrigger} : Joystick button {(key < KeyCode.Joystick1Button0 ? "?" : key.ToString())}");
+                                Override.Drive[SetTrigger] = (KeyCode)Mathf.RoundToInt(GUILayout.HorizontalSlider((int)key,350,369));
+                            }
+                            else
+                            {
+                                IsSettingKeybind = GUILayout.Button(IsSettingKeybind ? "Press a key for use" : Override.Drive[SetTrigger].ToString()) != IsSettingKeybind;
+                            }
                         }
                         GUILayout.Label("Choose a function below to change the key bound to it");
                         scroll2 = GUILayout.BeginScrollView(scroll2);
@@ -358,6 +397,10 @@ namespace LocalMultiplayer
             //}
             public Dictionary<string, KeyCode> Drive = new Dictionary<string, KeyCode>();
 
+            public int JoystickAxisX = -1, JoystickAxisY = -1;
+
+            public int CurrentJoystick = -1;
+
             public static string[] DriveReference = new string[]{
                 // "MoveX_MoveRight", 
                 // "MoveX_MoveLeft", 
@@ -380,38 +423,67 @@ namespace LocalMultiplayer
             public Overrider() { }
             public void Validate()
             {
-                foreach(var thing in DriveReference)
+                foreach(var Key in DriveReference)
                 {
-                    if (!Drive.ContainsKey(thing))
+                    if (!Drive.ContainsKey(Key))
                     {
-                        Drive.Add(thing, KeyCode.None);
+                        Drive.Add(Key, KeyCode.None);
                     }
                 }
             }
-            public Overrider(Dictionary<string, KeyCode> Copy)
+            public Overrider(Overrider Copy)
             {
-                foreach (var thing in DriveReference)
+                foreach (var Key in DriveReference)
                 {
-                    if (Copy.ContainsKey(thing))
-                        Drive.Add(thing, Copy[thing]);
+                    if (Copy.Drive.ContainsKey(Key))
+                        Drive.Add(Key, Copy.Drive[Key]);
                     else
-                        Drive.Add(thing, KeyCode.None);
+                        Drive.Add(Key, KeyCode.None);
                 }
             }
 
             public bool ReverseSteering = false;
 
+            public static bool ReadInputJoystick(int Joystick, KeyCode Button)
+            {
+                if (Joystick == -1)
+                {
+                    return false;
+                }
+                return Input.GetKey(Joystick * 20 + Button);
+            }
+            public static bool ReadInputDownJoystick(int Joystick, KeyCode Button)
+            {
+                if (Joystick == -1)
+                {
+                    return false;
+                }
+                return Input.GetKeyDown(Joystick * 20 + Button);
+            }
+
             public bool ReadInput(string Key)
             {
                 if (!Drive.ContainsKey(Key))
                     return false;
-                return Input.GetKey(Drive[Key]);
+                return Input.GetKey(Drive[Key]) || ReadInputJoystick(CurrentJoystick, Drive[Key]);
             }
             public bool ReadInputDown(string Key)
             {
                 if (!Drive.ContainsKey(Key))
                     return false;
-                return Input.GetKeyDown(Drive[Key]);
+                return Input.GetKeyDown(Drive[Key]) || ReadInputDownJoystick(CurrentJoystick, Drive[Key]);
+            }
+
+            public static float ReadAxisJoystick(int Joystick, int Axis)
+            {
+                if (Joystick == -1 || Axis == -1)
+                    return 0f;
+                return Input.GetAxis($"joystick {Joystick} axis {Axis}");
+            }
+
+            public float ReadAxis(string KeyPositive, string KeyNegative, int JoystickAxis = -1)
+            {
+                return Mathf.Clamp((ReadInput(KeyPositive) ? 1 : 0) + (ReadInput(KeyNegative) ? -1 : 0) + ReadAxisJoystick(CurrentJoystick, JoystickAxis),-1,1);
             }
 
             private int AnchorCache;
@@ -444,8 +516,9 @@ namespace LocalMultiplayer
                 //ApplyThrottle(This, true, ref inputMovement.x, ref this.m_ThrottleValues.x, ref this.m_ThrottleLastInput.x, ref this.m_ThrottleTiming.x);
                 //ApplyThrottle(This, true, ref inputMovement.y, ref this.m_ThrottleValues.y, ref this.m_ThrottleLastInput.y, ref this.m_ThrottleTiming.y);
                 //ApplyThrottle(This, true, ref inputMovement.z, ref this.m_ThrottleValues.z, ref this.m_ThrottleLastInput.z, ref this.m_ThrottleTiming.z);
-                var Rotate = (ReadInput("RotateY_YawLeft") ? 1 : 0) + (ReadInput("RotateY_YawRight") ? -1 : 0);
-                if (ReverseSteering && ReadInput("MoveZ_MoveBackward"/* || this.m_ThrottleValues[2] < -0.01f*/))
+                var Drive = ReadAxis("MoveZ_MoveForward", "MoveZ_MoveBackward", JoystickAxisY);
+                var Rotate = ReadAxis("RotateY_YawLeft", "RotateY_YawRight", JoystickAxisX);
+                if (ReverseSteering && Drive < -0.01f)
                 {
                     Vector3 forward = This.Tech.rootBlockTrans.forward;
                     if (Vector3.Dot(This.Tech.rbody.velocity, forward) < 0f)
@@ -454,7 +527,7 @@ namespace LocalMultiplayer
                     }
                 }
                 //this.m_ControlState.m_State.m_InputMovement = inputMovement;
-                This.DriveControl = (ReadInput("MoveZ_MoveForward") ? 1 : 0) + (ReadInput("MoveZ_MoveBackward") ? -1 : 0);//inputMovement.z;
+                This.DriveControl = Drive;//inputMovement.z;
                 //this.m_ControlState.m_State.m_InputRotation = inputRotation;
                 This.TurnControl = Rotate;//inputRotation.y;
 

@@ -489,7 +489,8 @@ namespace LocalMultiplayer
             {
                 if (Joystick == -1 || Axis == -1)
                     return 0f;
-                return Input.GetAxisRaw($"Joy{Joystick+1}Axis{Axis + 1}");
+                var value = Input.GetAxisRaw($"Joy{Joystick + 1}Axis{Axis + 1}");
+                return Mathf.Abs(value) > 0.1f ? value : 0f;
             }
 
             public float ReadAxis(string KeyPositive, string KeyNegative, int JoystickAxis = -1)

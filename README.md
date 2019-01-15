@@ -1,4 +1,4 @@
-# Local Multiplayer
+# [Local Multiplayer Mod](https://forum.terratechgame.com/index.php?threads/local-multiplayer-revived.18160/)
 A recreation of the Local Multiplayer Inject mod for TerraTech!
 
 You can install this mod to your game using the [TerraTech Mod Manager](https://github.com/aceba1/terratech-mod-manager/).

@@ -67,7 +67,7 @@ namespace LocalMultiplayer
                         string name = (tank.GetValue(__instance) as Tank).name;
                         if (Overrides.ContainsKey(name))
                         {
-                            m_NudgeInput.SetValue(__instance, Overrides[name].GetAxis());
+                            m_NudgeInput.SetValue(__instance, Overrides[name].BuildBeamAxis());
                         }
                     }
                     catch { }
@@ -153,10 +153,10 @@ namespace LocalMultiplayer
                 if (Overrides.Count != 0)
                 {
                     scroll1 = GUILayout.BeginScrollView(scroll1, false, false);
-                    GUI.changed = false;
                     if (Names == null) Names = Overrides.Keys.ToArray();
+                    int oSI = SelectionIndex;
                     SelectionIndex = GUILayout.SelectionGrid(SelectionIndex, Names, 5);
-                    if (GUI.changed && SelectionIndex != -1)
+                    if (oSI != SelectionIndex && SelectionIndex != -1)
                     {
                         try
                         {
@@ -177,9 +177,16 @@ namespace LocalMultiplayer
                     {
                         var Override = Overrides[Selected];
                         GUILayout.BeginHorizontal();
-                        Override.CurrentJoystick = GUILayout.Toggle(Override.CurrentJoystick != -1, "") ? (Override.CurrentJoystick == -1 ? 0 : Override.CurrentJoystick) : -1;
-                        GUILayout.Label("Use Joystick");
-                        int.TryParse(GUILayout.TextField(Override.CurrentJoystick.ToString()), out Override.CurrentJoystick);
+                        bool Joystick = Override.CurrentJoystick != -1;
+                        Override.CurrentJoystick = GUILayout.Toggle(Joystick, "") ? (!Joystick ? 0 : Override.CurrentJoystick) : -1;
+                        GUILayout.Label("Use Joystick : " + (Joystick ? "Joystick #" + (Override.CurrentJoystick + 1).ToString() : "Off"));
+                        if (Joystick)
+                        {
+                            int val = Override.CurrentJoystick + 1;
+
+                            int.TryParse(GUILayout.TextField((Override.CurrentJoystick + 1).ToString()), out val);
+                            Override.CurrentJoystick = Mathf.Clamp(val - 1,0,10);
+                        }
                         GUILayout.EndHorizontal();
                         GUILayout.BeginHorizontal();
                         Override.ReverseSteering = GUILayout.Toggle(Override.ReverseSteering, "");
@@ -203,7 +210,7 @@ namespace LocalMultiplayer
                             {
                                 Overrides.Remove(oldsel);
                                 Overrides.Add(Selected, Override);
-                                Names = null;
+                                Names.Where(t => t == Selected);
                             }
                         }
 
@@ -224,31 +231,35 @@ namespace LocalMultiplayer
                             }
                         }
 
-                        if (SetTrigger != "")
+
+                        if (Override.CurrentJoystick != -1)
                         {
-                            if (Override.CurrentJoystick != -1)
+                            GUILayout.BeginHorizontal();
                             {
-                                GUILayout.BeginHorizontal();
+                                GUILayout.BeginVertical();
                                 {
-                                    GUILayout.BeginVertical();
-                                    {
-                                        GUILayout.Label($"Drive X : {(Override.JoystickAxisX == -1?"No Axis":"Axis "+Override.JoystickAxisX)}");
-                                        Override.JoystickAxisX = Mathf.RoundToInt(GUILayout.HorizontalSlider(Override.JoystickAxisX, -1, 7));
-                                    }
-                                    GUILayout.EndVertical();
-                                    GUILayout.BeginVertical();
-                                    {
-                                        GUILayout.Label($"Drive Y : {(Override.JoystickAxisY == -1 ? "No Axis" : "Axis " + Override.JoystickAxisY)}");
-                                        Override.JoystickAxisY = Mathf.RoundToInt(GUILayout.HorizontalSlider(Override.JoystickAxisY, -1, 7));
-                                    }
-                                    GUILayout.EndVertical();
+                                    GUILayout.Label($"Drive Turning : {(Override.JoystickAxisX == -1 ? "No Axis" : "Axis " + Override.JoystickAxisX)}");
+                                    Override.JoystickAxisX = Mathf.RoundToInt(GUILayout.HorizontalSlider(Override.JoystickAxisX, -1, 19));
                                 }
-                                GUILayout.EndHorizontal();
-                                var key = Override.Drive[SetTrigger];
-                                GUILayout.Label($"{SetTrigger} : Joystick button {(key < KeyCode.Joystick1Button0 ? "?" : key.ToString())}");
-                                Override.Drive[SetTrigger] = (KeyCode)Mathf.RoundToInt(GUILayout.HorizontalSlider((int)key,350,369));
+                                GUILayout.EndVertical();
+                                GUILayout.BeginVertical();
+                                {
+                                    GUILayout.Label($"Drive Throttle : {(Override.JoystickAxisY == -1 ? "No Axis" : "Axis " + Override.JoystickAxisY)}");
+                                    Override.JoystickAxisY = Mathf.RoundToInt(GUILayout.HorizontalSlider(Override.JoystickAxisY, -1, 19));
+                                }
+                                GUILayout.EndVertical();
                             }
-                            else
+                            GUILayout.EndHorizontal();
+                            if (SetTrigger != "")
+                            {
+                                var key = Override.Drive[SetTrigger];
+                                GUILayout.Label($"{SetTrigger} : Joystick button {(key < KeyCode.Joystick1Button0 ? "?" : (key - 350).ToString())}");
+                                Override.Drive[SetTrigger] = (KeyCode)Mathf.RoundToInt(GUILayout.HorizontalSlider((int)key, 350, 369));
+                            }
+                        }
+                        else
+                        {
+                            if (SetTrigger != "")
                             {
                                 IsSettingKeybind = GUILayout.Button(IsSettingKeybind ? "Press a key for use" : Override.Drive[SetTrigger].ToString()) != IsSettingKeybind;
                             }
@@ -478,12 +489,12 @@ namespace LocalMultiplayer
             {
                 if (Joystick == -1 || Axis == -1)
                     return 0f;
-                return Input.GetAxis($"joystick {Joystick} axis {Axis}");
+                return Input.GetAxisRaw($"Joy{Joystick+1}Axis{Axis + 1}");
             }
 
             public float ReadAxis(string KeyPositive, string KeyNegative, int JoystickAxis = -1)
             {
-                return Mathf.Clamp((ReadInput(KeyPositive) ? 1 : 0) + (ReadInput(KeyNegative) ? -1 : 0) + ReadAxisJoystick(CurrentJoystick, JoystickAxis),-1,1);
+                return Mathf.Clamp((ReadInput(KeyPositive) ? 1 : 0) + (ReadInput(KeyNegative) ? -1 : 0) - ReadAxisJoystick(CurrentJoystick, JoystickAxis),-1,1);
             }
 
             private int AnchorCache;
@@ -588,9 +599,9 @@ namespace LocalMultiplayer
                 }
             }
 
-            internal Vector2 GetAxis()
+            internal Vector2 BuildBeamAxis()
             {
-                return new Vector2((ReadInput("RotateY_YawLeft") ? -1 : 0) + (ReadInput("RotateY_YawRight") ? 1 : 0), (ReadInput("MoveZ_MoveForward") ? 1 : 0) + (ReadInput("MoveZ_MoveBackward") ? -1 : 0));
+                return new Vector2(-ReadAxis("RotateY_YawLeft", "RotateY_YawRight", JoystickAxisX), ReadAxis("MoveZ_MoveForward", "MoveZ_MoveBackward", JoystickAxisY));
             }
         }
     }

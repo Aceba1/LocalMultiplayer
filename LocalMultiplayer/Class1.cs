@@ -259,15 +259,18 @@ namespace LocalMultiplayer
                 Vector2 OldValue;
                 Vector2 StartMove;
                 bool IsScaling;
-
+                public float GetYAngle(Vector3 v1, Vector3 v2)
+                {
+                    return Mathf.Rad2Deg * Mathf.Atan2(v1.x - v2.x, v1.z - v2.z);
+                }
                 void OnGUI()
                 {
                     if (BoundTank == null || Singleton.playerTank == null)
                         return;
-                    var angle = Mathf.RoundToInt(Vector3.SignedAngle(BoundTank.rootBlockTrans.forward, Vector3.Scale(BoundTank.rootBlockTrans.InverseTransformPoint(Singleton.playerTank.rootBlockTrans.position), new Vector3(1,0,1)), Vector3.up));
+                    var angle = Mathf.RoundToInt(GetYAngle(Vector3.zero, transform.InverseTransformPoint(Singleton.playerTank.rootBlockTrans.position)));
 
                     GUI.Label(new Rect(Start.x, Screen.height - Start.y - Stretch.y, Stretch.x - 50, 30), TankName);
-                    GUI.Box(new Rect(Start.x + Stretch.x - 50, Screen.height - Start.y-Stretch.y, 50, 30), angle.ToString());
+                    GUI.Box(new Rect(Start.x + Stretch.x - 50, Screen.height - Start.y - Stretch.y, 50, 30), angle.ToString());
                 }
 
                 void Update()
@@ -279,13 +282,12 @@ namespace LocalMultiplayer
                             IsMoving = false;
                         return;
                     }
-
                     var euler = Quaternion.Euler(0, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
-                    var offset = euler * new Vector3(0, 2f, -4);
-                    offset *= BoundTank.blockBounds.extents.magnitude;
+                    var offset = euler * new Vector3(0f, 1.5f, -4f);
+                    offset = offset * BoundTank.blockBounds.extents.magnitude + offset;
 
                     transform.position = BoundTank.WorldCenterOfMass + offset;
-                    transform.rotation = Quaternion.Euler(0, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
+                    transform.rotation = Quaternion.Euler(-15, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
 
                     if (!IsMoving)
                     {

@@ -267,10 +267,20 @@ namespace LocalMultiplayer
                 {
                     if (BoundTank == null || Singleton.playerTank == null)
                         return;
+
                     var angle = Mathf.RoundToInt(GetYAngle(Vector3.zero, transform.InverseTransformPoint(Singleton.playerTank.rootBlockTrans.position)));
 
-                    GUI.Label(new Rect(Start.x, Screen.height - Start.y - Stretch.y, Stretch.x - 50, 30), TankName);
-                    GUI.Box(new Rect(Start.x + Stretch.x - 50, Screen.height - Start.y - Stretch.y, 50, 30), angle.ToString());
+                    string anglechar = "↓";
+                    if (angle >157 || angle < -157) anglechar = "↑";
+                    else if (angle >  112)          anglechar = "↖";
+                    else if (angle < -112)          anglechar = "↗";
+                    else if (angle >   67)          anglechar = "←";
+                    else if (angle <  -67)          anglechar = "→";
+                    else if (angle >   22)          anglechar = "↙";
+                    else if (angle <  -22)          anglechar = "↘";
+
+                    GUI.Label(new Rect(Start.x, Screen.height - Start.y - Stretch.y, Stretch.x - 30, 30), TankName);
+                    GUI.Box(new Rect(Start.x + Stretch.x - 30, Screen.height - Start.y - Stretch.y, 30, 30), anglechar);
                 }
 
                 void Update()
@@ -294,7 +304,7 @@ namespace LocalMultiplayer
                         if (Input.GetMouseButtonDown(0))
                         {
                             Vector2 mouse = GUIUtility.ScreenToGUIPoint(new Vector2(Input.mousePosition.x, Input.mousePosition.y));
-                            if (new Rect(Start.x + Stretch.x - 50, Start.y+ Stretch.y - 30, 50, 30).Contains(mouse))
+                            if (new Rect(Start.x + Stretch.x - 30, Start.y+ Stretch.y - 30, 30, 30).Contains(mouse))
                             {
                                 IsMoving = true; isMoving = true; IsScaling = true;
                                 StartMove = mouse;

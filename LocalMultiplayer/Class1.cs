@@ -283,11 +283,11 @@ namespace LocalMultiplayer
                         return;
                     }
                     var euler = Quaternion.Euler(0, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
-                    var offset = euler * new Vector3(0f, 1.5f, -4f);
+                    var offset = euler * new Vector3(0f, 2f, -4f);
                     offset = offset * BoundTank.blockBounds.extents.magnitude + offset;
 
                     transform.position = BoundTank.WorldCenterOfMass + offset;
-                    transform.rotation = Quaternion.Euler(-15, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
+                    transform.rotation = Quaternion.Euler(15, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
 
                     if (!IsMoving)
                     {

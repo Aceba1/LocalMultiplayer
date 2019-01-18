@@ -457,34 +457,46 @@ namespace LocalMultiplayer
 
             public static bool ReadInputJoystick(int Joystick, KeyCode Button)
             {
-                if (Joystick == -1)
-                {
-                    return false;
-                }
+                if (Joystick == -1) return false;
                 return Input.GetKey(Joystick * 20 + Button);
-            }
-            public static bool ReadInputDownJoystick(int Joystick, KeyCode Button)
-            {
-                if (Joystick == -1)
-                {
-                    return false;
-                }
-                return Input.GetKeyDown(Joystick * 20 + Button);
             }
 
             public bool ReadInput(string Key)
             {
-                if (!Drive.ContainsKey(Key))
-                    return false;
+                if (!Drive.ContainsKey(Key)) return false;
                 return Input.GetKey(Drive[Key]) || ReadInputJoystick(CurrentJoystick, Drive[Key]);
             }
+            List<string> HeldInputs = new List<string>();
             public bool ReadInputDown(string Key)
             {
-                if (!Drive.ContainsKey(Key))
-                    return false;
-                return Input.GetKeyDown(Drive[Key]) || ReadInputDownJoystick(CurrentJoystick, Drive[Key]);
+                if (!Drive.ContainsKey(Key)) return false;
+                bool Active = Input.GetKey(Drive[Key]) || ReadInputJoystick(CurrentJoystick, Drive[Key]);
+                if (Active)
+                {
+                    if (HeldInputs.Contains(Key))
+                    {
+                        return false;
+                    }
+                    HeldInputs.Add(Key);
+                    return true;
+                }
+                HeldInputs.Remove(Key);
+                return false;
             }
-
+            public bool ReadInputUp(string Key)
+            {
+                if (!Drive.ContainsKey(Key)) return false;
+                bool Active = Input.GetKey(Drive[Key]) || ReadInputJoystick(CurrentJoystick, Drive[Key]);
+                if (Active)
+                {
+                    if (!HeldInputs.Contains(Key))
+                    {
+                        HeldInputs.Add(Key);
+                    }
+                    return false;
+                }
+                return HeldInputs.Remove(Key);
+            }
             public static float ReadAxisJoystick(int Joystick, int Axis)
             {
                 if (Joystick == -1 || Axis == -1)
@@ -560,11 +572,12 @@ namespace LocalMultiplayer
 
                 //ANCHOR
                 {
-                    if (ReadInputDown("Anchor"))
+                    bool flagAnchor = ReadInputDown("Anchor");
+                    if (flagAnchor)
                     {
                         AnchorCache = Tank.IsAnchored ? 2 : 1;
                     }
-                    if (ReadInput("Anchor") && AnchorCache == (Tank.IsAnchored ? 2 : 1))
+                    if (flagAnchor || (ReadInput("Anchor") && AnchorCache == (Tank.IsAnchored ? 2 : 1)))
                     {
                         try
                         {

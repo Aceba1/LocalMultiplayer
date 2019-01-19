@@ -154,7 +154,7 @@ namespace LocalMultiplayer
                     scroll1 = GUILayout.BeginScrollView(scroll1, false, false);
                     if (Names == null) Names = Overrides.Keys.ToArray();
                     int nSI = GUILayout.SelectionGrid(SelectionIndex, Names, 5);
-                    if (nSI != SelectionIndex && SelectionIndex != -1)
+                    if (nSI != SelectionIndex && nSI != -1)
                     {
                         SelectionIndex = nSI;
                         try

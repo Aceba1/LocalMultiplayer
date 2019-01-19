@@ -177,7 +177,8 @@ namespace LocalMultiplayer
                         var Override = Overrides[Selected];
                         GUILayout.BeginHorizontal();
                         bool Joystick = Override.CurrentJoystick != -1;
-                        Override.CurrentJoystick = GUILayout.Toggle(Joystick, "") ? (!Joystick ? -1 : Override.CurrentJoystick) : -1;
+                        bool SetOn = GUILayout.Toggle(Joystick, "");
+                        Override.CurrentJoystick = SetOn ? (!Joystick ? 0 : Override.CurrentJoystick) : -1;
                         GUILayout.Label("Use Joystick : " + (Joystick ? "Joystick #" + (Override.CurrentJoystick + 1).ToString() : "Off"));
                         if (Override.CurrentJoystick != -1)
                         {

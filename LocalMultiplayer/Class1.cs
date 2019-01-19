@@ -11,8 +11,7 @@ namespace LocalMultiplayer
 {
     public class OverrideBase
     {
-        internal static string NewCamTarget = "";
-        internal static bool NewCam = false;
+        internal static List<string> NewCamTargets = new List<string>();
 
         public static Dictionary<string, Overrider> Overrides;
         public static ModConfig modconfig;
@@ -154,10 +153,10 @@ namespace LocalMultiplayer
                 {
                     scroll1 = GUILayout.BeginScrollView(scroll1, false, false);
                     if (Names == null) Names = Overrides.Keys.ToArray();
-                    int oSI = SelectionIndex;
-                    SelectionIndex = GUILayout.SelectionGrid(SelectionIndex, Names, 5);
-                    if (oSI != SelectionIndex && SelectionIndex != -1)
+                    int nSI = GUILayout.SelectionGrid(SelectionIndex, Names, 5);
+                    if (nSI != SelectionIndex && SelectionIndex != -1)
                     {
+                        SelectionIndex = nSI;
                         try
                         {
                             Selected = Names[SelectionIndex];
@@ -178,27 +177,33 @@ namespace LocalMultiplayer
                         var Override = Overrides[Selected];
                         GUILayout.BeginHorizontal();
                         bool Joystick = Override.CurrentJoystick != -1;
-                        Override.CurrentJoystick = GUILayout.Toggle(Joystick, "") ? (!Joystick ? 0 : Override.CurrentJoystick) : -1;
+                        Override.CurrentJoystick = GUILayout.Toggle(Joystick, "") ? (!Joystick ? -1 : Override.CurrentJoystick) : -1;
                         GUILayout.Label("Use Joystick : " + (Joystick ? "Joystick #" + (Override.CurrentJoystick + 1).ToString() : "Off"));
-                        if (Joystick)
+                        if (Override.CurrentJoystick != -1)
                         {
                             int val = Override.CurrentJoystick + 1;
-
-                            int.TryParse(GUILayout.TextField((Override.CurrentJoystick + 1).ToString()), out val);
-                            Override.CurrentJoystick = Mathf.Clamp(val - 1,0,10);
+                            Override.CurrentJoystick = Mathf.RoundToInt(GUILayout.HorizontalSlider(val, 1, 11)) - 1;
                         }
                         GUILayout.EndHorizontal();
                         GUILayout.BeginHorizontal();
                         Override.ReverseSteering = GUILayout.Toggle(Override.ReverseSteering, "");
                         GUILayout.Label("Invert Reverse Steering");
-                        if (GUILayout.Button("Activate Camera"))
+                        bool camiswaiting = NewCamTargets.Contains(Selected);
+                        if (GUILayout.Button(camiswaiting ? "Camera is waiting..." : "Toggle Camera"))
                         {
-                            NewCam = true;
-                            NewCamTarget = Selected;
+                            if (camiswaiting)
+                            {
+                                NewCamTargets.Remove(Selected);
+                            }
+                            else
+                            {
+                                NewCamTargets.Add(Selected);
+                            }
                         }
                         GUILayout.EndHorizontal();
                         GUILayout.Label("Name of techs to override with this controller");
                         string oldsel = Selected;
+                        GUI.SetNextControlName("TechName");
                         Selected = GUILayout.TextField(Selected);
                         if (oldsel != Selected)
                         {
@@ -210,7 +215,15 @@ namespace LocalMultiplayer
                             {
                                 Overrides.Remove(oldsel);
                                 Overrides.Add(Selected, Override);
-                                Names.Where(t => t == Selected);
+                                for (int i = 0; i < Names.Length; i++)
+                                {
+                                    if (Names[i] == oldsel)
+                                    {
+                                        Names[i] = Selected;
+                                        break;
+                                    }
+                                }
+                                GUI.FocusControl("TechName");
                             }
                         }
 
@@ -253,15 +266,19 @@ namespace LocalMultiplayer
                             if (SetTrigger != "")
                             {
                                 var key = Override.Drive[SetTrigger];
-                                GUILayout.Label($"{SetTrigger} : Joystick button {(key < KeyCode.Joystick1Button0 ? "?" : (key - 350).ToString())}");
-                                Override.Drive[SetTrigger] = (KeyCode)Mathf.RoundToInt(GUILayout.HorizontalSlider((int)key, 350, 369));
+                                GUILayout.Label($"{SetTrigger} : Joystick button {(key < KeyCode.Joystick1Button0 ? (key == KeyCode.None?"None":"?") : ((int)key - 350).ToString())}");
+                                var NewVal = (KeyCode)Mathf.RoundToInt(GUILayout.HorizontalSlider((int)key, 349, 369));
+                                if (NewVal == KeyCode.JoystickButton19) NewVal = KeyCode.None;
+                                Override.Drive[SetTrigger] = NewVal;
                             }
                         }
                         else
                         {
                             if (SetTrigger != "")
                             {
-                                IsSettingKeybind = GUILayout.Button(IsSettingKeybind ? "Press a key for use" : Override.Drive[SetTrigger].ToString()) != IsSettingKeybind;
+                                bool Clicked = GUILayout.Button(IsSettingKeybind ? "Press a key for use" : Override.Drive[SetTrigger].ToString());
+                                if (Clicked && IsSettingKeybind) Override.Drive[SetTrigger] = KeyCode.None;
+                                IsSettingKeybind = Clicked != IsSettingKeybind;
                             }
                         }
                         GUILayout.Label("Choose a function below to change the key bound to it");
@@ -337,9 +354,13 @@ namespace LocalMultiplayer
                 {
                     if (BoundTank == null || BoundTank.name != TankName)
                     {
-                        Destroy(gameObject);
+                        if (Overrides.ContainsKey(TankName))
+                            {
+                            NewCamTargets.Add(TankName);
+                        }
                         if (isMoving)
                             IsMoving = false;
+                        Destroy(gameObject);
                         return;
                     }
                     var euler = Quaternion.Euler(0, BoundTank.rootBlockTrans.rotation.eulerAngles.y, 0);
@@ -464,13 +485,13 @@ namespace LocalMultiplayer
             public bool ReadInput(string Key)
             {
                 if (!Drive.ContainsKey(Key)) return false;
-                return Input.GetKey(Drive[Key]) || ReadInputJoystick(CurrentJoystick, Drive[Key]);
+                return CurrentJoystick == -1 ? Input.GetKey(Drive[Key]) : ReadInputJoystick(CurrentJoystick, Drive[Key]);
             }
             List<string> HeldInputs = new List<string>();
             public bool ReadInputDown(string Key)
             {
                 if (!Drive.ContainsKey(Key)) return false;
-                bool Active = Input.GetKey(Drive[Key]) || ReadInputJoystick(CurrentJoystick, Drive[Key]);
+                bool Active = CurrentJoystick == -1 ? Input.GetKey(Drive[Key]) : ReadInputJoystick(CurrentJoystick, Drive[Key]);
                 if (Active)
                 {
                     if (HeldInputs.Contains(Key))
@@ -486,7 +507,7 @@ namespace LocalMultiplayer
             public bool ReadInputUp(string Key)
             {
                 if (!Drive.ContainsKey(Key)) return false;
-                bool Active = Input.GetKey(Drive[Key]) || ReadInputJoystick(CurrentJoystick, Drive[Key]);
+                bool Active = CurrentJoystick == -1 ? Input.GetKey(Drive[Key]) : ReadInputJoystick(CurrentJoystick, Drive[Key]);
                 if (Active)
                 {
                     if (!HeldInputs.Contains(Key))
@@ -515,23 +536,19 @@ namespace LocalMultiplayer
             public void GetInput(TankControl This)
             {
                 var Tank = This.GetComponentInParent<Tank>();
-                if (NewCam)
+                if (NewCamTargets.Contains(Tank.name))
                 {
-                    if (NewCamTarget == Tank.name)
+                    NewCamTargets.Remove(Tank.name);
+                    ControllerCam cam = Tank.gameObject.GetComponentInChildren<ControllerCam>();
+                    if (cam == null)
                     {
-                        NewCam = false;
-                        NewCamTarget = "";
-                        ControllerCam cam = Tank.gameObject.GetComponentInChildren<ControllerCam>();
-                        if (cam == null)
-                        {
-                            ControllerCam.Create(Tank);
-                        }
-                        else
-                        {
-                            if (cam.isMoving)
-                                ControllerCam.IsMoving = false;
-                            GameObject.Destroy(cam.gameObject);
-                        }
+                        ControllerCam.Create(Tank);
+                    }
+                    else
+                    {
+                        if (cam.isMoving)
+                            ControllerCam.IsMoving = false;
+                        GameObject.Destroy(cam.gameObject);
                     }
                 }
                 //Vector3 inputMovement = new Vector3(ReadDriveAxisPair("MoveX_MoveRight", "MoveX_MoveLeft"), ReadDriveAxisPair("MoveY_MoveUp", "MoveY_MoveDown"), ReadDriveAxisPair("MoveZ_MoveForward", "MoveZ_MoveBackward"));

@@ -117,6 +117,7 @@ namespace LocalMultiplayer
             string Selected = "";
             string[] Names;
             int SelectionIndex, TriggerIndex;
+            bool SetNamingFocus;
             void GUIWindow(int ID)
             {
                 GUILayout.BeginHorizontal();
@@ -205,7 +206,25 @@ namespace LocalMultiplayer
                         GUILayout.Label("Name of techs to override with this controller");
                         string oldsel = Selected;
                         GUI.SetNextControlName("TechName");
+                        if (SetNamingFocus)
+                        {
+                            GUI.FocusControl("TechName");
+                        }
                         Selected = GUILayout.TextField(Selected);
+                        if (SetNamingFocus)
+                        {
+
+                            GUI.FocusControl("TechName");
+
+                            SetNamingFocus = false;
+
+                            TextEditor te = (TextEditor)GUIUtility.GetStateObject(typeof(TextEditor), GUIUtility.keyboardControl);
+                            te.OnFocus();
+                            te.text = "";
+                            te.text = Selected;
+                            te.MoveTextEnd();
+                            te.SelectNone();
+                        }
                         if (oldsel != Selected)
                         {
                             if (Overrides.ContainsKey(Selected))
@@ -224,7 +243,7 @@ namespace LocalMultiplayer
                                         break;
                                     }
                                 }
-                                GUI.FocusControl("TechName");
+                                SetNamingFocus = true;
                             }
                         }
 

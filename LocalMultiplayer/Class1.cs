@@ -620,7 +620,7 @@ namespace LocalMultiplayer
                         {
                             if (Tank.IsAnchored)
                             {
-                                Tank.Anchors.UnanchorAll();
+                                Tank.Anchors.UnanchorAll(false, false);
                                 AnchorCache = ((AnchorCache == (Tank.IsAnchored ? 2 : 1)) ? 2 : 0);
                             }
                             else

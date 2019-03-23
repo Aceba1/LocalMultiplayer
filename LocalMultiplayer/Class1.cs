@@ -31,6 +31,9 @@ namespace LocalMultiplayer
                 o.Value.Validate();
             }
             new GameObject("Override Controller").AddComponent<OverrideController>();
+            OverrideController.GuiDisp = new GameObject();
+            OverrideController.GuiDisp.AddComponent<OverrideController.GUIDisplay>();
+            OverrideController.GuiDisp.SetActive(false);
         }
         private static class Patches
         {
@@ -76,36 +79,30 @@ namespace LocalMultiplayer
 
         internal class OverrideController : MonoBehaviour
         {
-            bool IsSettingKeybind = false;
-            string SetTrigger = "";
-            int ID = 5189012;
-            bool Show = false, ShowControllerSetup = false;
-            Rect rect = new Rect(0, 0, 800, 600), rect2 = new Rect(0, 0, 800, 600);
+            static bool IsSettingKeybind = false;
+            static string SetTrigger = "";
+            static int ID = 5189012;
+            static bool Show = false, ShowControllerSetup = false;
+            static Rect rect = new Rect(0, 0, 800, 600), rect2 = new Rect(0, 0, 800, 600);
+            static public GameObject GuiDisp;
             void Start()
             {
                 modconfig.UpdateConfig += ConfigUpdate;
             }
 
-            void ConfigUpdate()
+            static void ConfigUpdate()
             {
                 IsSettingKeybind = false;
                 Names = null;
                 Selected = "";
                 SelectionIndex = -1;
             }
-
-            void OnGUI()
-            {
-                if (Show)
-                {
-                    rect = GUI.Window(ID, rect, GUIWindow, "Override Controllers");
-                }
-            }
             void Update()
             {
                 if (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.M))
                 {
                     Show = !Show;
+                    GuiDisp.SetActive(Show);
                     if (!Show)
                     {
                         modconfig.WriteConfigJsonFile();
@@ -113,12 +110,12 @@ namespace LocalMultiplayer
                     }
                 }
             }
-            Vector2 scroll1, scroll2, scroll3;
-            string Selected = "";
-            string[] Names;
-            int SelectionIndex, TriggerIndex;
-            bool SetNamingFocus;
-            void GUIWindow(int ID)
+            static Vector2 scroll1, scroll2, scroll3;
+            static string Selected = "";
+            static string[] Names;
+            static int SelectionIndex, TriggerIndex;
+            static bool SetNamingFocus;
+            static void GUIWindow(int ID)
             {
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button("Create New Controller"))
@@ -315,6 +312,13 @@ namespace LocalMultiplayer
                 }
                 GUI.DragWindow();
             }
+            internal class GUIDisplay : MonoBehaviour
+            {
+                public void OnGUI()
+                {
+                    rect = GUI.Window(ID, rect, GUIWindow, "Override Controllers");
+                }
+            }
         }
 
         public class Overrider
@@ -350,7 +354,7 @@ namespace LocalMultiplayer
                 {
                     return Mathf.Rad2Deg * Mathf.Atan2(v1.x - v2.x, v1.z - v2.z);
                 }
-                void OnGUI()
+                /*void OnGUI()
                 {
                     if (BoundTank == null || Singleton.playerTank == null)
                         return;
@@ -368,8 +372,8 @@ namespace LocalMultiplayer
 
                     GUI.Label(new Rect(Start.x, Screen.height - Start.y - Stretch.y, Stretch.x - 30, 30), TankName);
                     GUI.Box(new Rect(Start.x + Stretch.x - 30, Screen.height - Start.y - Stretch.y, 30, 30), anglechar);
-                }
-
+                }*/
+                
                 void Update()
                 {
                     if (BoundTank == null || BoundTank.name != TankName)
@@ -654,6 +658,7 @@ namespace LocalMultiplayer
             {
                 return new Vector2(-ReadAxis("RotateY_YawLeft", "RotateY_YawRight", JoystickAxisX), ReadAxis("MoveZ_MoveForward", "MoveZ_MoveBackward", JoystickAxisY));
             }
+
         }
     }
 }

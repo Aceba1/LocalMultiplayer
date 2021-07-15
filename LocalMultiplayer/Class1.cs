@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Harmony;
+using HarmonyLib;
 using UnityEngine;
 using System.Reflection;
 using ModHelper.Config;
@@ -18,7 +18,7 @@ namespace LocalMultiplayer
 
         public static void Init()
         {
-            var harmony = HarmonyInstance.Create("ttmm.localmp");
+            var harmony = new Harmony("ttmm.localmp");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
             modconfig = new ModConfig();
             modconfig.BindConfig<OverrideBase>(null, "Overrides", true);
